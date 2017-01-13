@@ -94,6 +94,7 @@ if __name__ == '__main__':
     parser.add_option('-n', '--nm-path', dest='nm', help='nm path')
     parser.add_option('-g', '--gdb-path', dest='gdb', help='gdb path')
     parser.add_option('-j', '--objdump-path', dest='objdump', help='objdump path')
+    parser.add_option('', '--sharename', dest='sharename', help='Samba share name')
     parser.add_option('-a', '--auto-dump', dest='autodump',
                       help='Auto find ram dumps from the path')
     parser.add_option('-o', '--outdir', dest='outdir', help='Output directory')
@@ -233,6 +234,7 @@ if __name__ == '__main__':
     gdb_path = options.gdb
     nm_path = options.nm
     objdump_path = options.objdump
+    sharename = options.sharename or ''
 
     if options.arm64:
         print_out_str('--64-bit is deprecated. Dumps are assumed to be 64-bit by default.')
@@ -294,7 +296,7 @@ if __name__ == '__main__':
     if options.everything:
         options.qtf = True
 
-    dump = RamDump(options, nm_path, gdb_path, objdump_path)
+    dump = RamDump(options, nm_path, gdb_path, objdump_path, sharename)
 
     if options.eval:
         if options.eval == '-':

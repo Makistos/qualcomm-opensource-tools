@@ -416,7 +416,7 @@ class RamDump():
                 if urc < 0:
                     break
 
-    def __init__(self, options, nm_path, gdb_path, objdump_path):
+    def __init__(self, options, nm_path, gdb_path, objdump_path, sharename):
         self.ebi_files = []
         self.phys_offset = None
         self.tz_start = 0
@@ -430,6 +430,10 @@ class RamDump():
         self.gdb_path = gdb_path
         self.objdump_path = objdump_path
         self.outdir = options.outdir
+        if sharename == '':
+            self.sharename = ''
+        else:
+            self.sharename = sharename if sharename.endswith('\\') or sharename.endswith('/') else sharename + '/'
         self.imem_fname = None
         self.gdbmi = gdbmi.GdbMI(self.gdb_path, self.vmlinux)
         self.gdbmi.open()
@@ -765,7 +769,10 @@ class RamDump():
         startup_script.write('sys.up\n'.encode('ascii', 'ignore'))
 
         for ram in self.ebi_files:
-            ebi_path = os.path.abspath(ram[3])
+            if self.sharename == '':
+                ebi_path = os.path.abspath(ram[3])
+            else:
+                ebi_path = self.sharename + ram[3]
             startup_script.write('data.load.binary {0} 0x{1:x}\n'.format(
                 ebi_path, ram[1]).encode('ascii', 'ignore'))
         if self.arm64:
@@ -801,8 +808,12 @@ class RamDump():
                     'PER.S.F C15:0x202 %L 0x80030000\n'.encode('ascii', 'ignore'))
             startup_script.write('mmu.on\n'.encode('ascii', 'ignore'))
             startup_script.write('mmu.scan\n'.encode('ascii', 'ignore'))
-        startup_script.write(
-            ('data.load.elf ' + os.path.abspath(self.vmlinux) + ' /nocode\n').encode('ascii', 'ignore'))
+        if self.sharename == '':
+            startup_script.write(
+                    ('data.load.elf ' + os.path.abspath(self.vmlinux) + ' /nocode\n').encode('ascii', 'ignore'))
+        else:
+            startup_script.write(
+                    ('data.load.elf ' + self.sharename + self.vmlinux + ' /nocode\n').encode('ascii', 'ignore'))
 
         if t32_host_system == 'Windows':
             if self.arm64:
@@ -812,9 +823,9 @@ class RamDump():
                      'menu.reprogram C:\\T32\\demo\\arm64\\kernel\\linux\\linux-3.x\\linux.men\n'.encode('ascii', 'ignore'))
             else:
                 startup_script.write(
-                    'task.config c:\\t32\\demo\\arm\\kernel\\linux\\linux.t32\n'.encode('ascii', 'ignore'))
+                    'task.config c:\\t32\\demo\\arm\\kernel\\linux\\linux-3.x\\linux3.t32\n'.encode('ascii', 'ignore'))
                 startup_script.write(
-                    'menu.reprogram c:\\t32\\demo\\arm\\kernel\\linux\\linux.men\n'.encode('ascii', 'ignore'))
+                    'menu.reprogram c:\\t32\\demo\\arm\\kernel\\linux\\linux-3.x\\linux.men\n'.encode('ascii', 'ignore'))
         else:
             if self.arm64:
                 startup_script.write(
@@ -830,26 +841,35 @@ class RamDump():
         startup_script.write('task.dtask\n'.encode('ascii', 'ignore'))
         startup_script.write(
             'v.v  %ASCII %STRING linux_banner\n'.encode('ascii', 'ignore'))
+        if self.sharename == '':
+            out_dir = out_path
+        else:
+            out_dir = self.sharename + out_path
+
         if os.path.exists(out_path + '/regs_panic.cmm'):
             startup_script.write(
-                'do {0}\n'.format(out_path + '/regs_panic.cmm').encode('ascii', 'ignore'))
+                'do {0}\n'.format(out_dir + '/regs_panic.cmm').encode('ascii', 'ignore'))
         elif os.path.exists(out_path + '/core0_regs.cmm'):
             startup_script.write(
-                'do {0}\n'.format(out_path + '/core0_regs.cmm').encode('ascii', 'ignore'))
+                'do {0}\n'.format(out_dir + '/core0_regs.cmm').encode('ascii', 'ignore'))
         startup_script.close()
 
         if t32_host_system == 'Windows':
-            t32_bat = open(out_path + '/launch_t32.bat', 'wb')
+            if self.sharename == '':
+                t32_bat = open(out_path + '/launch_t32.bat', 'wb')
+            else:
+                t32_bat = open('launch_t32.bat', 'wb')
             if self.arm64:
                 t32_binary = 'C:\\T32\\bin\\windows64\\t32MARM64.exe'
             elif is_cortex_a53:
                 t32_binary = 'C:\\T32\\bin\\windows64\\t32MARM.exe'
             else:
-                t32_binary = 'c:\\t32\\t32MARM.exe'
+                t32_binary = 'c:\\t32\\bin\\windows\\t32MARM.exe'
             t32_bat.write(('start '+ t32_binary + ' -c ' + out_path + '/t32_config.t32, ' +
                           out_path + '/t32_startup_script.cmm').encode('ascii', 'ignore'))
+            os.chmod('launch_t32.bat', stat.S_IRWXU)
         else:
-            t32_bat = open(out_path + '/launch_t32.sh', 'wb')
+            t32_bat = open(out_path + 'launch_t32.sh', 'wb')
             if t32_host_system == 'Darwin':
                 t32_bin_path = 'macosx64'
             else:
